@@ -16,7 +16,7 @@ class CharRNN(FunctionSet):
         for param in self.parameters:
             param[:] = np.random.uniform(-0.08, 0.08, param.shape)
 
-    def forward_one_step(self, x_data, y_data, m, s, state, train=True, dropout_ratio=0.5):
+    def forward_one_step(self, x_data, y_data, mask,probablity_mask, state, train=True, dropout_ratio=0.5):
         x = Variable(x_data, volatile=not train)
         t = Variable(y_data, volatile=not train)
         #m = Variable(m_data, volatile=train)
@@ -29,7 +29,7 @@ class CharRNN(FunctionSet):
         y       = self.l3(F.dropout(h2, ratio=dropout_ratio, train=train))
         state   = {'c1': c1, 'h1': h1, 'c2': c2, 'h2': h2}
 
-        return state, F.softmax_cross_entropy(y * m, t)
+        return state, F.softmax_cross_entropy(y * mask + probablity_mask, t)
 
     def predict(self, x_data, state):
         x = Variable(x_data, volatile=True)
