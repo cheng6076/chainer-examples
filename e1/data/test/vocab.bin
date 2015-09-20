@@ -1,11 +1,11 @@
 (dp1
 S'\n'
 I22
-sS'EOW'
-p2
-I23
 sS' '
 I4
+sS'GO'
+p2
+I23
 sS'a'
 I5
 sS'c'

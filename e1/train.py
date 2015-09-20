@@ -11,6 +11,7 @@ import numpy as np
 from chainer import cuda, Variable, FunctionSet, optimizers
 import chainer.functions as F
 from CharRNN import CharRNN, make_initial_state
+from utils import prepare_data
 
 # input data
 def load_data(args):
@@ -23,40 +24,31 @@ def load_data(args):
     for i, char in enumerate(chars):
         if char not in vocab:
             vocab[char] = len(vocab)
-    vocab['EOW'] = len(vocab)
-
+    vocab['GO'] = len(vocab)
+    vocab_index_of_GO = vocab['GO']
     dataset = []
-    mask = []
     window = 1
-    max_len= args.max_len
+    
     for i, word in enumerate(words):
         for j in range(i-window, i+window):
             if j==i or j<0 or j>=len(words): continue
             entry_x=[]
-            entry_m=[]
+ 
             for char in word:
                 entry_x.append(vocab[char])
-                entry_m.append(0)
-            entry_x.append(vocab['EOW'])
-            entry_m.append(0)
+              
+            entry_x.append(vocab['GO'])
+            
             for char in words[j]:
                 entry_x.append(vocab[char])
-                entry_m.append(1)
-            if len(entry_x)>max_len:
-                entry_x = entry_x[:max_len]
-                entry_m = entry_m[:max_len]
-            else:
-                while len(entry_x)<max_len:
-                    entry_x.append(0)
-                    entry_m.append(0)
+                
             dataset.append(entry_x)
-            mask.append(entry_m)
-
-    dataset = np.asarray(dataset, dtype=np.int32)
-    mask = np.asarray(mask, dtype=np.int32)
-    print 'corpus length:', len(chars)
-    print 'vocab size:', len(vocab)
-    return dataset, chars, vocab, mask
+            
+    #dataset = np.asarray(dataset, dtype=np.int32)
+    #mask = np.asarray(mask, dtype=np.int32)
+    print 'corpus word length:', len(words)
+    print 'character vocab length:', len(vocab)
+    return dataset, chars, vocab, vocab_index_of_GO
 
 # arguments
 parser = argparse.ArgumentParser()
@@ -86,7 +78,7 @@ batchsize   = args.batchsize
 bprop_len   = args.seq_length
 grad_clip   = args.grad_clip
 
-train_data, chars, vocab, mask = load_data(args)
+train_data, chars, vocab, vocab_index_of_GO = load_data(args)
 pickle.dump(vocab, open('%s/vocab.bin'%args.data_dir, 'wb'))
 
 if len(args.init_from) > 0:
@@ -101,9 +93,9 @@ if args.gpu >= 0:
 optimizer = optimizers.RMSprop(lr=args.learning_rate, alpha=args.decay_rate, eps=1e-8)
 optimizer.setup(model.collect_parameters())
 
-whole_len    = train_data.shape[0]
+whole_len    = len(train_data)
 n_batches    = whole_len / batchsize
-train_data   = train_data[:n_batches*batchsize,:]
+train_data   = train_data[:n_batches*batchsize]
 epoch        = 0
 start_at     = time.time()
 cur_at       = start_at
@@ -119,15 +111,16 @@ print 'going to train {} iterations'.format(n_batches * n_epochs)
 for i in xrange(n_epochs):
   for j in xrange(n_batches):
     batch_data = train_data[j*batchsize:(j+1)*batchsize]
-    batch_data = batch_data.T
-    mask_data = mask[j*batchsize:(j+1)*batchsize]
-    mask_data = mask_data.T
-    assert batch_data.shape[0] == args.max_len
-    assert mask_data.shape[0] == args.max_len
-    for timestep in xrange(args.max_len):
+    batch_data, mask_data = prepare_data(batch_data, vocab_index_of_GO)
+    #batch_data = batch_data.T
+    #mask_data = mask[j*batchsize:(j+1)*batchsize]
+    #mask_data = mask_data.T
+    #assert batch_data.shape[0] == args.max_len
+    #assert mask_data.shape[0] == args.max_len
+    for timestep in xrange(len(batch_data)):
         x_batch = batch_data[timestep]
         y_batch = x_batch * mask_data[timestep]
-        m_batch = mask_data[timestep].astype(np.float32)
+        m_batch = mask_data[timestep].astype(np.float32) #this has to be converted here
         mask_bar = 1-m_batch
         m_batch = m_batch[:,None]
         
