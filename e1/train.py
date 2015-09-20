@@ -74,7 +74,7 @@ parser.add_argument('--batchsize',                  type=int,   default=5)
 parser.add_argument('--epochs',                     type=int,   default=50)
 parser.add_argument('--grad_clip',                  type=int,   default=5)
 parser.add_argument('--init_from',                  type=str,   default='')
-parser.add_argument('--max_len',                    type=int,   default=30)
+parser.add_argument('--max_len',                    type=int,   default=10)
 args = parser.parse_args()
 
 if not os.path.exists(args.checkpoint_dir):
@@ -102,7 +102,8 @@ optimizer = optimizers.RMSprop(lr=args.learning_rate, alpha=args.decay_rate, eps
 optimizer.setup(model.collect_parameters())
 
 whole_len    = train_data.shape[0]
-n_batches    = whole_len / batchsize 
+n_batches    = whole_len / batchsize
+train_data   = train_data[:n_batches*batchsize,:]
 epoch        = 0
 start_at     = time.time()
 cur_at       = start_at
@@ -115,10 +116,11 @@ else:
     accum_loss   = Variable(np.zeros((), dtype=np.float32))
 print train_data
 print 'going to train {} iterations'.format(n_batches * n_epochs)
-for i in xrange(n_epochs * n_batches):
-    batch_data = train_data[i%n_batches*batchsize:(i+1)%n_batches*batchsize]
+for i in xrange(n_epochs):
+  for j in xrange(n_batches):
+    batch_data = train_data[j*batchsize:(j+1)*batchsize]
     batch_data = batch_data.T
-    mask_data = mask[i%n_batches*batchsize:(i+1)%n_batches*batchsize]
+    mask_data = mask[j*batchsize:(j+1)*batchsize]
     mask_data = mask_data.T
     assert batch_data.shape[0] == args.max_len
     assert mask_data.shape[0] == args.max_len
